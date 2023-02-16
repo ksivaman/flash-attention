@@ -22,7 +22,7 @@ void run_fmha_bwd_hdim64(FMHA_dgrad_params &params, cudaStream_t stream, const b
                 using Kernel_traits = FMHA_kernel_traits<256, 64, 16, 1, 8, 0x08u, elem_type>;
                 run_fmha_bwd_loop<Kernel_traits>(params, stream, configure);
             } else if (dprops->major == 9 && dprops->minor >= 0) {
-                using Kernel_traits = FMHA_kernel_traits<256, 64, 16, 1, 8, 0x08u, elem_type>;
+                using Kernel_traits = FMHA_kernel_traits<256, 64, 16, 1, 8, 0x100u, elem_type>;
                 run_fmha_bwd_loop<Kernel_traits>(params, stream, configure);
             } else if (dprops->major == 7 && dprops->minor == 5) {
                 using Kernel_traits = FMHA_kernel_traits<128, 64, 16, 1, 8, 0x08u, elem_type>;
