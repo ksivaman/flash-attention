@@ -408,7 +408,7 @@ mha_bwd(const at::Tensor &dout,  // total_q x num_heads, x head_size
     TORCH_CHECK(batch_size > 0);
     TORCH_CHECK((head_size % 8 == 0) && (head_size <= 128));
     if (head_size > 64) {  // TODO: eventually we should support SM86 and SM70 with d=128 as well
-        TORCH_CHECK(is_sm80);
+        TORCH_CHECK(is_sm80 || is_sm9x);
     }
 
     CHECK_SHAPE(q, total_q, num_heads, head_size);
@@ -650,6 +650,7 @@ mha_bwd_block(const at::Tensor &dout,  // total x num_heads, x head_size
     auto dprops = at::cuda::getCurrentDeviceProperties();
     bool is_sm80 = dprops->major == 8 && dprops->minor == 0;
     bool is_sm8x = dprops->major == 8 && dprops->minor >= 0;
+    bool is_sm9x = dprops->major == 9 && dprops->minor >= 0;
     TORCH_CHECK(dprops->major == 8 && dprops->minor >= 0);
     auto launch = &run_fmha_block_dgrad_fp16_sm80;
 
@@ -700,7 +701,7 @@ mha_bwd_block(const at::Tensor &dout,  // total x num_heads, x head_size
     TORCH_CHECK(batch_size > 0);
     TORCH_CHECK(head_size == 16 || head_size == 32 || head_size == 64 || head_size == 128);
     if (head_size == 128) {  // TODO: eventually we should support SM86 and SM70 with d=128 as well
-        TORCH_CHECK(is_sm80);
+        TORCH_CHECK(is_sm80 || is_sm9x);
     }
 
     CHECK_SHAPE(q, total_q, num_heads, head_size);
