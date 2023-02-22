@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import flash_attn_cuda
 
 
-_deterministic_execution = not int(os.getenv("NVTE_ALLOW_NONDETERMINISTIC_ALGO", "0"))
+_deterministic_execution = not int(os.getenv("NVTE_ALLOW_NONDETERMINISTIC_ALGO", "1"))
 
 
 def _get_block_size(device, head_dim, is_dropout):
