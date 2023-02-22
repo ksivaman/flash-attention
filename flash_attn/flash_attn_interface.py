@@ -1,8 +1,13 @@
+import os
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 import flash_attn_cuda
+
+
+_deterministic_execution = not int(os.getenv("NVTE_ALLOW_NONDETERMINISTIC_ALGO", "0"))
 
 
 def _get_block_size(device, head_dim, is_dropout):
@@ -77,7 +82,8 @@ class FlashAttnQKVPackedFunc(torch.autograd.Function):
         _flash_attn_backward(
             dout, qkv[:, 0], qkv[:, 1], qkv[:, 2], out, softmax_lse,
             dqkv[:, 0], dqkv[:, 1], dqkv[:, 2], cu_seqlens, cu_seqlens,
-            ctx.max_seqlen, ctx.max_seqlen, ctx.dropout_p, ctx.softmax_scale, ctx.causal
+            ctx.max_seqlen, ctx.max_seqlen, ctx.dropout_p, ctx.softmax_scale, ctx.causal,
+            num_splits=1 if _deterministic_execution else 0,
         )
         if rng_state is not None:
             torch.cuda.set_rng_state(cur_rng_state)
@@ -116,7 +122,8 @@ class FlashAttnKVPackedFunc(torch.autograd.Function):
         _flash_attn_backward(
             dout, q, kv[:, 0], kv[:, 1], out, softmax_lse,
             dq, dkv[:, 0], dkv[:, 1], cu_seqlens_q, cu_seqlens_k,
-            ctx.max_seqlen_q, ctx.max_seqlen_k, ctx.dropout_p, ctx.softmax_scale, ctx.causal
+            ctx.max_seqlen_q, ctx.max_seqlen_k, ctx.dropout_p, ctx.softmax_scale, ctx.causal,
+            num_splits=1 if _deterministic_execution else 0,
         )
         if rng_state is not None:
             torch.cuda.set_rng_state(cur_rng_state)
@@ -153,7 +160,8 @@ class FlashAttnFunc(torch.autograd.Function):
         dq, dk, dv = torch.empty_like(q), torch.empty_like(k), torch.empty_like(v)
         _flash_attn_backward(
             dout, q, k, v, out, softmax_lse, dq, dk, dv, cu_seqlens_q, cu_seqlens_k,
-            ctx.max_seqlen_q, ctx.max_seqlen_k, ctx.dropout_p, ctx.softmax_scale, ctx.causal
+            ctx.max_seqlen_q, ctx.max_seqlen_k, ctx.dropout_p, ctx.softmax_scale, ctx.causal,
+            num_splits=1 if _deterministic_execution else 0,
         )
         if rng_state is not None:
             torch.cuda.set_rng_state(cur_rng_state)
@@ -223,7 +231,7 @@ class FlashAttnQKVPackedSplitFunc(torch.autograd.Function):
             dout, qkv[:, 0], qkv[:, 1], qkv[:, 2], out, softmax_lse0,
             dqkv[:, 0], dqkv[:, 1], dqkv[:, 2], cu_seqlens[:batch_size0 + 1],
             cu_seqlens[:batch_size0 + 1], ctx.max_seqlen0, ctx.max_seqlen0, ctx.dropout_p,
-            ctx.softmax_scale, ctx.causal
+            ctx.softmax_scale, ctx.causal, num_splits=1 if _deterministic_execution else 0,
         )
         s = torch.cuda.Stream()
         with torch.cuda.stream(s):
@@ -231,7 +239,8 @@ class FlashAttnQKVPackedSplitFunc(torch.autograd.Function):
                 dout, qkv[:, 0], qkv[:, 1], qkv[:, 2], out, softmax_lse1,
                 dqkv[:, 0], dqkv[:, 1], dqkv[:, 2], cu_seqlens[batch_size0:],
                 cu_seqlens[batch_size0:], ctx.max_seqlen1, ctx.max_seqlen1, ctx.dropout_p,
-                ctx.softmax_scale, ctx.causal, generator=generator1
+                ctx.softmax_scale, ctx.causal, generator=generator1,
+                num_splits=1 if _deterministic_execution else 0,
             )
         torch.cuda.current_stream().wait_stream(s)
         if rng_state0 is not None:
